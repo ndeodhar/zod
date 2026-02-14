@@ -217,3 +217,41 @@ test("z.xor() type inference", () => {
   type Result = z.infer<typeof schema>;
   expectTypeOf<Result>().toEqualTypeOf<string | number | boolean>();
 });
+
+// Test informative error messages for literal unions
+test("literal union shows expected values in error message", () => {
+  const schema = z.union([z.literal("a"), z.literal("b"), z.literal("c")]);
+  const result = schema.safeParse("d");
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.issues[0].message).toContain("Invalid option");
+    expect(result.error.issues[0].message).toContain("expected one of");
+    expect(result.error.issues[0].message).toContain('"a"');
+    expect(result.error.issues[0].message).toContain('"b"');
+    expect(result.error.issues[0].message).toContain('"c"');
+    expect(result.error.issues[0].message).toContain('received "d"');
+  }
+});
+
+test("literal union with numbers shows expected values", () => {
+  const schema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
+  const result = schema.safeParse(4);
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.issues[0].message).toContain("Invalid option");
+    expect(result.error.issues[0].message).toContain("expected one of");
+    expect(result.error.issues[0].message).toContain("1");
+    expect(result.error.issues[0].message).toContain("2");
+    expect(result.error.issues[0].message).toContain("3");
+    expect(result.error.issues[0].message).toContain("received 4");
+  }
+});
+
+test("non-literal union keeps generic error message", () => {
+  const schema = z.union([z.number(), z.string()]);
+  const result = schema.safeParse(true);
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.issues[0].message).toBe("Invalid input");
+  }
+});
