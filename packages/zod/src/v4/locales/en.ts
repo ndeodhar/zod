@@ -102,8 +102,16 @@ const error: () => errors.$ZodErrorMap = () => {
         return `Unrecognized key${issue.keys.length > 1 ? "s" : ""}: ${util.joinValues(issue.keys, ", ")}`;
       case "invalid_key":
         return `Invalid key in ${issue.origin}`;
-      case "invalid_union":
+      case "invalid_union": {
+        // Check if the union has a finite set of expected values
+        if (issue.inst?._zod && "values" in issue.inst._zod && issue.inst._zod.values) {
+          const values = Array.from(issue.inst._zod.values) as util.Primitive[];
+          const expected = util.joinValues(values, ", ");
+          const received = util.stringifyPrimitive(issue.input);
+          return `Invalid input: expected one of ${expected}, received ${received}`;
+        }
         return "Invalid input";
+      }
       case "invalid_element":
         return `Invalid value in ${issue.origin}`;
       default:

@@ -217,3 +217,15 @@ test("z.xor() type inference", () => {
   type Result = z.infer<typeof schema>;
   expectTypeOf<Result>().toEqualTypeOf<string | number | boolean>();
 });
+
+test("informative error for union of literals", () => {
+  const schema = z.union([z.literal("a"), z.literal("b")]);
+  const result = schema.safeParse("c");
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.issues[0].message).toContain("expected one of");
+    expect(result.error.issues[0].message).toContain('"a"');
+    expect(result.error.issues[0].message).toContain('"b"');
+    expect(result.error.issues[0].message).toContain('received "c"');
+  }
+});
