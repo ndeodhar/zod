@@ -101,8 +101,32 @@ const error: () => errors.$ZodErrorMap = () => {
         return `அடையாளம் தெரியாத விசை${issue.keys.length > 1 ? "கள்" : ""}: ${util.joinValues(issue.keys, ", ")}`;
       case "invalid_key":
         return `${issue.origin} இல் தவறான விசை`;
-      case "invalid_union":
+      case "invalid_union": {
+        // Try to extract expected values from nested errors if it's a union of literals
+        if (issue.errors && issue.errors.length > 0) {
+          const allLiteralErrors = issue.errors.every(
+            (errArray) => errArray.length === 1 && errArray[0].code === "invalid_value" && errArray[0].path.length === 0
+          );
+
+          if (allLiteralErrors) {
+            const allValues: util.Primitive[] = [];
+            for (const errArray of issue.errors) {
+              const err = errArray[0];
+              if (err && err.code === "invalid_value") {
+                allValues.push(...err.values);
+              }
+            }
+
+            if (allValues.length > 0) {
+              const valuesStr = util.joinValues(allValues, " | ");
+              const receivedType = util.parsedType(issue.input);
+              const received = typeof issue.input === "string" ? util.stringifyPrimitive(issue.input) : receivedType;
+              return `தவறான விருப்பம்: இவற்றில் ஒன்று எதிர்பார்க்கப்படுகிறது ${valuesStr}, பெறப்பட்டது ${received}`;
+            }
+          }
+        }
         return "தவறான உள்ளீடு";
+      }
       case "invalid_element":
         return `${issue.origin} இல் தவறான மதிப்பு`;
       default:

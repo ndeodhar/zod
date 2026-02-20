@@ -104,8 +104,32 @@ const error: () => errors.$ZodErrorMap = () => {
         return `인식할 수 없는 키: ${util.joinValues(issue.keys, ", ")}`;
       case "invalid_key":
         return `잘못된 키: ${issue.origin}`;
-      case "invalid_union":
+      case "invalid_union": {
+        // Try to extract expected values from nested errors if it's a union of literals
+        if (issue.errors && issue.errors.length > 0) {
+          const allLiteralErrors = issue.errors.every(
+            (errArray) => errArray.length === 1 && errArray[0].code === "invalid_value" && errArray[0].path.length === 0
+          );
+
+          if (allLiteralErrors) {
+            const allValues: util.Primitive[] = [];
+            for (const errArray of issue.errors) {
+              const err = errArray[0];
+              if (err && err.code === "invalid_value") {
+                allValues.push(...err.values);
+              }
+            }
+
+            if (allValues.length > 0) {
+              const valuesStr = util.joinValues(allValues, " | ");
+              const receivedType = util.parsedType(issue.input);
+              const received = typeof issue.input === "string" ? util.stringifyPrimitive(issue.input) : receivedType;
+              return `잘못된 옵션: 다음 중 하나가 예상됨 ${valuesStr}, 받음 ${received}`;
+            }
+          }
+        }
         return `잘못된 입력`;
+      }
       case "invalid_element":
         return `잘못된 값: ${issue.origin}`;
       default:

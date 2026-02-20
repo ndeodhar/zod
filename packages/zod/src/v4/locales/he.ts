@@ -225,8 +225,32 @@ const error: () => errors.$ZodErrorMap = () => {
         return `שדה לא תקין באובייקט`;
       }
 
-      case "invalid_union":
+      case "invalid_union": {
+        // Try to extract expected values from nested errors if it's a union of literals
+        if (issue.errors && issue.errors.length > 0) {
+          const allLiteralErrors = issue.errors.every(
+            (errArray) => errArray.length === 1 && errArray[0].code === "invalid_value" && errArray[0].path.length === 0
+          );
+
+          if (allLiteralErrors) {
+            const allValues: util.Primitive[] = [];
+            for (const errArray of issue.errors) {
+              const err = errArray[0];
+              if (err && err.code === "invalid_value") {
+                allValues.push(...err.values);
+              }
+            }
+
+            if (allValues.length > 0) {
+              const valuesStr = util.joinValues(allValues, " | ");
+              const receivedType = util.parsedType(issue.input);
+              const received = typeof issue.input === "string" ? util.stringifyPrimitive(issue.input) : receivedType;
+              return `אפשרות לא חוקית: צפוי אחד מ ${valuesStr}, התקבל ${received}`;
+            }
+          }
+        }
         return "קלט לא תקין";
+      }
 
       case "invalid_element": {
         const place = withDefinite(issue.origin ?? "array");
