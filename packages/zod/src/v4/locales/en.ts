@@ -103,29 +103,25 @@ const error: () => errors.$ZodErrorMap = () => {
       case "invalid_key":
         return `Invalid key in ${issue.origin}`;
       case "invalid_union": {
-        // Try to extract expected values from nested errors if it's a union of literals
-        if (issue.errors && issue.errors.length > 0) {
-          const allLiteralErrors = issue.errors.every(
-            (errArray) => errArray.length === 1 && errArray[0].code === "invalid_value" && errArray[0].path.length === 0
-          );
-
-          if (allLiteralErrors) {
-            const allValues: util.Primitive[] = [];
-            for (const errArray of issue.errors) {
-              const err = errArray[0];
-              if (err && err.code === "invalid_value") {
-                allValues.push(...err.values);
-              }
+        // Check if all nested errors are invalid_value errors (union of literals)
+        const invalidValueErrors = issue.errors
+          .flat()
+          .filter((err) => err.code === "invalid_value" && err.values);
+        
+        // If we have invalid_value errors, collect all expected values
+        if (invalidValueErrors.length > 0) {
+          const allValues = invalidValueErrors.flatMap((err) => err.values);
+          if (allValues.length > 0) {
+            const valuesStr = util.joinValues(allValues as util.Primitive[], ", ");
+            if (issue.input !== undefined) {
+              const receivedStr = util.stringifyPrimitive(issue.input);
+              return `Invalid option: expected one of ${valuesStr}, but received ${receivedStr}`;
             }
-
-            if (allValues.length > 0) {
-              const valuesStr = util.joinValues(allValues, " | ");
-              const receivedType = util.parsedType(issue.input);
-              const received = typeof issue.input === "string" ? util.stringifyPrimitive(issue.input) : receivedType;
-              return `Invalid option: expected one of ${valuesStr}, received ${received}`;
-            }
+            return `Invalid option: expected one of ${valuesStr}`;
           }
         }
+        
+        // Fallback for other union types
         return "Invalid input";
       }
       case "invalid_element":
