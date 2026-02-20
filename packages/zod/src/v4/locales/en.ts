@@ -102,8 +102,21 @@ const error: () => errors.$ZodErrorMap = () => {
         return `Unrecognized key${issue.keys.length > 1 ? "s" : ""}: ${util.joinValues(issue.keys, ", ")}`;
       case "invalid_key":
         return `Invalid key in ${issue.origin}`;
-      case "invalid_union":
+      case "invalid_union": {
+        const _issue = issue as errors.$ZodRawIssue<errors.$ZodIssueInvalidUnion>;
+        // Check for exclusive union (multiple matches) vs no matches
+        if (_issue.inclusive === false) {
+          return "Invalid input: matched multiple union options (expected exactly one)";
+        }
+        // Check if the union schema has defined literal values
+        const inst = _issue.inst as any;
+        if (inst?._zod?.values) {
+          const expectedValues = Array.from(inst._zod.values as Set<util.Primitive>);
+          const received = util.stringifyPrimitive(_issue.input);
+          return `Invalid input: expected one of ${util.joinValues(expectedValues, ", ")}, but received ${received}`;
+        }
         return "Invalid input";
+      }
       case "invalid_element":
         return `Invalid value in ${issue.origin}`;
       default:

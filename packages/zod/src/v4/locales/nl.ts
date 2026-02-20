@@ -104,8 +104,21 @@ const error: () => errors.$ZodErrorMap = () => {
         return `Onbekende key${issue.keys.length > 1 ? "s" : ""}: ${util.joinValues(issue.keys, ", ")}`;
       case "invalid_key":
         return `Ongeldige key in ${issue.origin}`;
-      case "invalid_union":
+      case "invalid_union": {
+        const _issue = issue as errors.$ZodRawIssue<errors.$ZodIssueInvalidUnion>;
+        // Check for exclusive union (multiple matches) vs no matches
+        if (_issue.inclusive === false) {
+          return "Ongeldige invoer: kwam overeen met meerdere union-opties (precies één verwacht)";
+        }
+        // Check if the union schema has defined literal values
+        const inst = _issue.inst as any;
+        if (inst?._zod?.values) {
+          const expectedValues = Array.from(inst._zod.values as Set<util.Primitive>);
+          const received = util.stringifyPrimitive(_issue.input);
+          return `Ongeldige invoer: verwacht één van ${util.joinValues(expectedValues, ", ")}, maar ontving ${received}`;
+        }
         return "Ongeldige invoer";
+      }
       case "invalid_element":
         return `Ongeldige waarde in ${issue.origin}`;
       default:

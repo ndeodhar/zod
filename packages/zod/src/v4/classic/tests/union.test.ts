@@ -217,3 +217,74 @@ test("z.xor() type inference", () => {
   type Result = z.infer<typeof schema>;
   expectTypeOf<Result>().toEqualTypeOf<string | number | boolean>();
 });
+
+// Issue #8: Informative error messages for unions of literals
+test("union of literals provides informative error message", () => {
+  const schema = z.union([z.literal("a"), z.literal("b")]);
+  const result = schema.safeParse("c");
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.issues[0].code).toBe("invalid_union");
+    expect(result.error.issues[0].message).toBe('Invalid input: expected one of "a", "b", but received "c"');
+  }
+});
+
+test("union of literals in object field shows informative error", () => {
+  const MySchemaType = z.union([z.literal("a"), z.literal("b")]);
+  const MySchema = z.object({
+    type: MySchemaType,
+  });
+  const result = MySchema.safeParse({ type: "c" });
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    expect(issue.code).toBe("invalid_union");
+    expect(issue.path).toEqual(["type"]);
+    expect(issue.message).toBe('Invalid input: expected one of "a", "b", but received "c"');
+  }
+});
+
+test("union of numeric literals shows informative error", () => {
+  const schema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
+  const result = schema.safeParse(4);
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.issues[0].message).toBe("Invalid input: expected one of 1, 2, 3, but received 4");
+  }
+});
+
+test("union of mixed literal types shows informative error", () => {
+  const schema = z.union([z.literal("a"), z.literal(1), z.literal(true)]);
+  const result = schema.safeParse("b");
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.issues[0].message).toBe('Invalid input: expected one of "a", 1, true, but received "b"');
+  }
+});
+
+test("union of non-literals still shows generic error", () => {
+  const schema = z.union([z.string(), z.number()]);
+  const result = schema.safeParse(true);
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.issues[0].message).toBe("Invalid input");
+  }
+});
+
+test("z.xor() with literals shows informative error when no matches", () => {
+  const schema = z.xor([z.literal("a"), z.literal("b")]);
+  const result = schema.safeParse("c");
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.issues[0].message).toBe('Invalid input: expected one of "a", "b", but received "c"');
+  }
+});
+
+test("z.xor() shows exclusive union error when multiple matches", () => {
+  const schema = z.xor([z.string(), z.any()]);
+  const result = schema.safeParse("hello");
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.issues[0].message).toBe("Invalid input: matched multiple union options (expected exactly one)");
+  }
+});

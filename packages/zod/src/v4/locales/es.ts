@@ -124,8 +124,21 @@ const error: () => errors.$ZodErrorMap = () => {
         return `Llave${issue.keys.length > 1 ? "s" : ""} desconocida${issue.keys.length > 1 ? "s" : ""}: ${util.joinValues(issue.keys, ", ")}`;
       case "invalid_key":
         return `Llave inválida en ${TypeDictionary[issue.origin] ?? issue.origin}`;
-      case "invalid_union":
+      case "invalid_union": {
+        const _issue = issue as errors.$ZodRawIssue<errors.$ZodIssueInvalidUnion>;
+        // Check for exclusive union (multiple matches) vs no matches
+        if (_issue.inclusive === false) {
+          return "Entrada inválida: coincidió con múltiples opciones de unión (se esperaba exactamente una)";
+        }
+        // Check if the union schema has defined literal values
+        const inst = _issue.inst as any;
+        if (inst?._zod?.values) {
+          const expectedValues = Array.from(inst._zod.values as Set<util.Primitive>);
+          const received = util.stringifyPrimitive(_issue.input);
+          return `Entrada inválida: se esperaba uno de ${util.joinValues(expectedValues, ", ")}, pero se recibió ${received}`;
+        }
         return "Entrada inválida";
+      }
       case "invalid_element":
         return `Valor inválido en ${TypeDictionary[issue.origin] ?? issue.origin}`;
       default:
